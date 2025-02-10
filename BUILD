@@ -1,6 +1,21 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 load("@com_github_grpc_grpc//bazel:cython_library.bzl", "pyx_library")
-load("//bazel:fury.bzl", "COPTS")
 
 
 pyx_library(
@@ -12,11 +27,10 @@ pyx_library(
         "python/pyfury/__init__.py",
     ]),
     cc_kwargs = dict(
-        copts = COPTS,
         linkstatic = 1,
     ),
     deps = [
-        "//src/fury/util:fury_util",
+        "//cpp/fury/util:fury_util",
     ],
 )
 
@@ -28,11 +42,10 @@ pyx_library(
         "python/pyfury/lib/mmh3/__init__.py",
     ]),
     cc_kwargs = dict(
-        copts = COPTS,
         linkstatic = 1,
     ),
     deps = [
-        "//src/fury/thirdparty:libmmh3",
+        "//cpp/fury/thirdparty:libmmh3",
     ],
 )
 
@@ -45,11 +58,11 @@ pyx_library(
         "python/pyfury/__init__.py",
     ]),
     cc_kwargs = dict(
-        copts = COPTS,
         linkstatic = 1,
     ),
     deps = [
-        "//src/fury/util:fury_util",
+        "//cpp/fury/util:fury_util",
+        "//cpp/fury/type:fury_type",
         "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
@@ -66,11 +79,10 @@ pyx_library(
         "python/pyfury/format/*.pxi",
     ]),
     cc_kwargs = dict(
-        copts = COPTS,
         linkstatic = 1,
     ),
     deps = [
-        "//src/fury:fury",
+        "//cpp/fury:fury",
         "@local_config_pyarrow//:python_numpy_headers",
         "@local_config_pyarrow//:arrow_python_shared_library"
     ],
@@ -91,10 +103,19 @@ genrule(
         set -e
         set -x
         WORK_DIR=$$(pwd)
-        cp -f $(location python/pyfury/_util.so) "$$WORK_DIR/python/pyfury"
-        cp -f $(location python/pyfury/lib/mmh3/mmh3.so) "$$WORK_DIR/python/pyfury/lib/mmh3"
-        cp -f $(location python/pyfury/format/_format.so) "$$WORK_DIR/python/pyfury/format"
-        cp -f $(location python/pyfury/_serialization.so) "$$WORK_DIR/python/pyfury"
+        u_name=`uname -s`
+        if [ "$${u_name: 0: 4}" == "MING" ] || [ "$${u_name: 0: 4}" == "MSYS" ]
+        then
+            cp -f $(location python/pyfury/_util.so) "$$WORK_DIR/python/pyfury/_util.pyd"
+            cp -f $(location python/pyfury/lib/mmh3/mmh3.so) "$$WORK_DIR/python/pyfury/lib/mmh3/mmh3.pyd"
+            cp -f $(location python/pyfury/format/_format.so) "$$WORK_DIR/python/pyfury/format/_format.pyd"
+            cp -f $(location python/pyfury/_serialization.so) "$$WORK_DIR/python/pyfury/_serialization.pyd"
+        else
+            cp -f $(location python/pyfury/_util.so) "$$WORK_DIR/python/pyfury"
+            cp -f $(location python/pyfury/lib/mmh3/mmh3.so) "$$WORK_DIR/python/pyfury/lib/mmh3"
+            cp -f $(location python/pyfury/format/_format.so) "$$WORK_DIR/python/pyfury/format"
+            cp -f $(location python/pyfury/_serialization.so) "$$WORK_DIR/python/pyfury"
+        fi
         echo $$(date) > $@
     """,
     local = 1,

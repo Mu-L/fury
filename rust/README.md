@@ -1,6 +1,7 @@
-# [Fury](https://github.com/alipay/fury) for Rust
+# Apache Fury™ Rust
 
-Fury is a blazing fast multi-language serialization framework powered by just-in-time compilation and zero-copy.
+Fury is a blazingly fast multi-language serialization framework powered by
+just-in-time compilation and zero-copy.
 
 Fury Rust can be implemented by steps:
 

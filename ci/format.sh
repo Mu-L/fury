@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+# This script is derived from https://github.com/ray-project/ray/blob/5ce25a57a0949673d17f3a8784f05b2d65290524/ci/lint/format.sh.
+
 # Black + Clang formatter (if installed). This script formats all changed files from the last mergebase.
 # You are encouraged to run this locally before pushing changes for review.
 
@@ -10,7 +13,7 @@ BLACK_VERSION_REQUIRED="22.1.0"
 SHELLCHECK_VERSION_REQUIRED="0.7.1"
 
 install_nodejs() {
-  #intall nodejs 
+  #intall nodejs
   filename="node-v16.17.1-linux-x64"
   pkg="$filename.tar.gz"
   NODE_URL="https://nodejs.org/dist/v16.17.1/$pkg"
@@ -86,7 +89,7 @@ fi
 if [ ! -f "$ROOT/javascript/node_modules/.bin/eslint" ]; then
   echo "eslint is not installed, start to install it."
   pushd "$ROOT/javascript"
-  npm install --registry=https://registry.npmmirror.com 
+  npm install --registry=https://registry.npmmirror.com
   popd
 fi
 
@@ -176,6 +179,26 @@ format_all_scripts() {
     fi
 }
 
+format_java() {
+    if command -v mvn >/dev/null ; then
+      echo "Maven installed"
+      cd "$ROOT/java"
+      mvn -T10 --no-transfer-progress spotless:apply
+      mvn -T10 --no-transfer-progress checkstyle:check
+      cd "$ROOT/java/benchmark"
+      mvn -T10 --no-transfer-progress spotless:apply
+      cd "$ROOT/integration_tests"
+      dirs=("graalvm_tests" "jdk_compatibility_tests" "latest_jdk_tests")
+      for d in "${dirs[@]}" ; do
+        pushd "$d"
+          mvn -T10 --no-transfer-progress spotless:apply
+        popd
+      done
+    else
+      echo "Maven not installed, skip java check"
+    fi
+}
+
 # Format all files, and print the diff to stdout for travis.
 format_all() {
     format_all_scripts "${@}"
@@ -187,15 +210,7 @@ format_all() {
 
     echo "$(date)" "format java...."
     if command -v java >/dev/null; then
-      if command -v mvn >/dev/null ; then
-        echo "Maven installed"
-        cd "$ROOT/java"
-        mvn -T10 license:format
-        mvn -T10 spotless:apply
-        mvn -T10 checkstyle:check
-      else
-        echo "Maven not installed, skip java check"
-      fi
+      format_java
     fi
 
     echo "$(date)" "format javascript...."
@@ -249,15 +264,7 @@ format_changed() {
 
     if command -v java >/dev/null; then
        if ! git diff --diff-filter=ACRM --quiet --exit-code "$MERGEBASE" -- '*.java' &>/dev/null; then
-          if command -v mvn >/dev/null ; then
-            echo "Maven installed"
-            cd "$ROOT/java"
-            mvn -T10 license:format
-            mvn -T10 spotless:apply
-            mvn -T10 checkstyle:check
-          else
-            echo "Maven not installed, skip java check"
-          fi
+         format_java
        fi
     fi
 
@@ -292,10 +299,12 @@ elif [ "${1-}" == '--all-scripts' ]; then
 elif [ "${1-}" == '--all' ]; then
     format_all "${@}"
     if [ -n "${FORMAT_SH_PRINT_DIFF-}" ]; then git --no-pager diff; fi
+elif [ "${1-}" == '--java' ]; then
+    format_java
 else
     # Add the origin remote if it doesn't exist
     if ! git remote -v | grep -q origin; then
-        git remote add 'origin' 'https://github.com/alipay/fury.git'
+        git remote add 'origin' 'https://github.com/apache/fury.git'
     fi
 
     # use unshallow fetch for `git merge-base origin/main HEAD` to work.

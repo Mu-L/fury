@@ -1,18 +1,77 @@
-use chrono::{NaiveDate, NaiveDateTime};
-use fury::{from_buffer, to_buffer};
-use fury_derive::{Deserialize, FuryMeta, Serialize};
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+use chrono::{DateTime, NaiveDate, NaiveDateTime};
+use fury_core::fury::Fury;
+use fury_core::types::Mode;
+use fury_derive::Fury;
+use std::any::Any;
 use std::collections::HashMap;
 
 #[test]
+fn any() {
+    #[derive(Fury, Debug)]
+    struct Animal {
+        f3: String,
+    }
+
+    #[derive(Fury, Debug)]
+    struct Person {
+        f1: Box<dyn Any>,
+    }
+
+    let person = Person {
+        f1: Box::new(Animal {
+            f3: String::from("hello"),
+        }),
+    };
+
+    let mut fury = Fury::default();
+    fury.register::<Animal>(999);
+    fury.register::<Person>(1000);
+    let bin = fury.serialize(&person);
+    let obj: Person = fury.deserialize(&bin).expect("");
+    assert!(obj.f1.is::<Animal>())
+}
+
+#[test]
+fn enum_without_payload() {
+    #[derive(Fury, Debug, PartialEq)]
+    enum Color {
+        Green,
+        Red,
+        Blue,
+    }
+    let mut fury = Fury::default();
+    fury.register::<Color>(999);
+    let color = Color::Red;
+    let bin = fury.serialize(&color);
+    let color2: Color = fury.deserialize(&bin).expect("");
+    assert_eq!(color, color2);
+}
+
+#[test]
 fn complex_struct() {
-    #[derive(FuryMeta, Serialize, Deserialize, Debug, PartialEq)]
-    #[tag("example.foo2")]
+    #[derive(Fury, Debug, PartialEq, Default)]
     struct Animal {
         category: String,
     }
 
-    #[derive(FuryMeta, Serialize, Deserialize, Debug, PartialEq)]
-    #[tag("example.foo")]
+    #[derive(Fury, Debug, PartialEq, Default)]
     struct Person {
         c1: Vec<u8>,  // binary
         c2: Vec<i16>, // primitive array
@@ -40,73 +99,31 @@ fn complex_struct() {
             ("hello2".to_string(), "hello3".to_string()),
         ]),
         age: 12,
-        name: "helo".to_string(),
+        name: "hello".to_string(),
         op: Some("option".to_string()),
         op2: None,
         date: NaiveDate::from_ymd_opt(2025, 12, 12).unwrap(),
-        time: NaiveDateTime::from_timestamp_opt(1689912359, 0).unwrap(),
+        time: DateTime::from_timestamp(1689912359, 0).unwrap().naive_utc(),
         c5: 2.0,
         c6: 4.0,
     };
+    let mut fury = Fury::default().mode(Mode::Compatible);
+    fury.register::<Person>(999);
+    fury.register::<Animal>(899);
 
-    let bin: Vec<u8> = to_buffer(&person);
-    let obj: Person = from_buffer(&bin).expect("should success");
+    let bin: Vec<u8> = fury.serialize(&person);
+    let obj: Person = fury.deserialize(&bin).expect("should success");
     assert_eq!(person, obj);
 }
 
 #[test]
-fn decode_py_struct() {
-    #[derive(FuryMeta, Serialize, Deserialize, Debug, PartialEq)]
-    #[tag("example.foo2")]
-    struct Animal {
-        category: String,
-    }
-
-    #[derive(FuryMeta, Serialize, Deserialize, Debug, PartialEq)]
-    #[tag("example.ComplexObject")]
-    struct Person {
-        f1: String,
-        f2: HashMap<String, i8>,
-        f3: i8,
-        f4: i16,
-        f5: i32,
-        f6: i64,
-        f7: f32,
-        f8: f64,
-        f9: Vec<i16>,
-        f10: HashMap<i32, f64>,
-    }
-
-    let bin = [
-        134, 2, 179, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 81, 159, 160, 124, 69, 240, 2, 120, 21, 0,
-        101, 120, 97, 109, 112, 108, 101, 46, 67, 111, 109, 112, 108, 101, 120, 79, 98, 106, 101,
-        99, 116, 71, 168, 32, 21, 0, 13, 0, 3, 115, 116, 114, 0, 30, 0, 2, 255, 7, 0, 1, 0, 0, 0,
-        255, 12, 0, 85, 85, 85, 85, 85, 85, 213, 63, 255, 7, 0, 100, 0, 0, 0, 255, 12, 0, 146, 36,
-        73, 146, 36, 73, 210, 63, 0, 30, 0, 2, 0, 13, 0, 2, 107, 49, 255, 3, 0, 255, 0, 13, 0, 2,
-        107, 50, 255, 3, 0, 2, 255, 3, 0, 127, 255, 5, 0, 255, 127, 255, 7, 0, 255, 255, 255, 127,
-        255, 9, 0, 255, 255, 255, 255, 255, 255, 255, 127, 255, 11, 0, 0, 0, 0, 63, 255, 12, 0, 85,
-        85, 85, 85, 85, 85, 229, 63, 0, 25, 0, 2, 255, 5, 0, 1, 0, 255, 5, 0, 2, 0, 134, 2, 98, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 81, 159, 160, 124, 69, 240, 2, 120, 21, 0, 101, 120, 97, 109,
-        112, 108, 101, 46, 67, 111, 109, 112, 108, 101, 120, 79, 98, 106, 101, 99, 116, 71, 168,
-        32, 21, 253, 253, 253, 255, 3, 0, 0, 255, 5, 0, 0, 0, 255, 7, 0, 0, 0, 0, 0, 255, 9, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 255, 11, 0, 171, 170, 170, 62, 255, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        253,
-    ];
-
-    let obj: Person = from_buffer(&bin).expect("should some");
-    print!("{:?}", obj);
-}
-
-#[test]
 fn encode_to_obin() {
-    #[derive(FuryMeta, Serialize, Deserialize, Debug, PartialEq)]
-    #[tag("example.foo2")]
+    #[derive(Fury, Debug, PartialEq, Default)]
     struct Animal {
         category: String,
     }
 
-    #[derive(FuryMeta, Serialize, Deserialize, Debug, PartialEq)]
-    #[tag("example.ComplexObject")]
+    #[derive(Fury, Debug, PartialEq, Default)]
     struct Person {
         f1: String,
         f2: HashMap<String, i8>,
@@ -118,8 +135,10 @@ fn encode_to_obin() {
         f8: f64,
         f10: HashMap<i32, f64>,
     }
-
-    let bin: Vec<u8> = to_buffer(&Person {
+    let mut fury = Fury::default();
+    fury.register::<Person>(999);
+    fury.register::<Animal>(899);
+    let bin: Vec<u8> = fury.serialize(&Person {
         f1: "Hello".to_string(),
         f2: HashMap::from([("hello1".to_string(), 1), ("hello2".to_string(), 2)]),
         f3: 1,

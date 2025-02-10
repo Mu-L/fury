@@ -1,23 +1,26 @@
 {
   "name": "@furyjs/hps",
-  "version": "0.0.6",
-  "description": "fury nodejs high-performance suite",
+  "version": "0.10.0.dev",
+  "description": "Apache Fury™(incubating) nodejs high-performance suite",
   "main": "dist/index.js",
   "files": [
     "dist",
     "src",
+    "scripts/preinstall.js",
     "binding.gyp"
   ],
+  "gypfile": false,
   "scripts": {
-    "postinstall": "npx node-gyp rebuild",
-    "build": "npx node-gyp rebuild && tsc",
+    "preinstall": "node ./scripts/preinstall.js",
+    "build": "node ./scripts/build.js",
     "prepublishOnly": "npm run build"
   },
-  "license": "Apache",
+  "license": "Apache-2.0",
   "dependencies": {
     "bindings": "~1.2.1",
-    "nan": "^2.17.0",
-    "node-gyp": "^9.4.0"
+    "fs-extra": "^11.3.0",
+    "nan": "^2.22.0",
+    "node-gyp": "^11.0.0"
   },
   "engines": {
     "node": "^20.0.0"

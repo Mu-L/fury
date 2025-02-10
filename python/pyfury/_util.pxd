@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # cython: profile=True
 # distutils: language = c++
 # cython: embedsignature = True
@@ -93,6 +110,8 @@ cdef class Buffer:
 
     cpdef inline c_bool read_bool(self)
 
+    cpdef inline uint8_t read_uint8(self)
+
     cpdef inline int8_t read_int8(self)
 
     cpdef inline int16_t read_int16(self)
@@ -107,19 +126,21 @@ cdef class Buffer:
 
     cpdef inline double read_double(self)
 
-    cpdef inline write_flagged_varint32(self, c_bool flag, int32_t v)
-
-    cpdef inline c_bool read_varint32_flag(self)
-
-    cpdef inline int32_t read_flagged_varint(self)
-
     cpdef inline write_varint64(self, int64_t v)
 
+    cpdef inline write_varuint64(self, int64_t v)
+
     cpdef inline int64_t read_varint64(self)
+
+    cpdef inline int64_t read_varuint64(self)
+
+    cpdef inline write_varuint32(self, int32_t value)
 
     cpdef inline write_varint32(self, int32_t value)
 
     cpdef inline int32_t read_varint32(self)
+
+    cpdef inline int32_t read_varuint32(self)
 
     cpdef put_buffer(self, uint32_t offset, v, int32_t src_index, int32_t length)
 
@@ -134,6 +155,8 @@ cdef class Buffer:
     cpdef inline write_bytes(self, bytes value)
 
     cpdef inline bytes read_bytes(self, int32_t length)
+
+    cpdef inline int64_t read_bytes_as_int64(self, int32_t length)
 
     cpdef inline put_bytes(self, uint32_t offset, bytes value)
 

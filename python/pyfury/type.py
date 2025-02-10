@@ -1,11 +1,35 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import array
 import dataclasses
-import enum
 import importlib
+import inspect
 
 import typing
 from typing import TypeVar
 from abc import ABC, abstractmethod
+
+try:
+    import numpy as np
+
+    ndarray = np.ndarray
+except ImportError:
+    np, ndarray = None, None
 
 
 # modified from `fluent python`
@@ -100,111 +124,110 @@ def get_qualified_classname(obj):
     return t.__module__ + "." + t.__name__
 
 
-class FuryType(enum.Enum):
+class TypeId:
     """
-    Fury added type for cross-language serialization.
-    See `io.fury.types.Type`
+    Fury type for cross-language serialization.
+    See `org.apache.fury.types.Type`
     """
 
-    NA = 0
-    # BOOL Boolean as 1 bit LSB bit-packed ordering
+    # a boolean value (true or false).
     BOOL = 1
-    # UINT8 Unsigned 8-bit little-endian integer
-    UINT8 = 2
-    # INT8 Signed 8-bit little-endian integer
-    INT8 = 3
-    # UINT16 Unsigned 16-bit little-endian integer
-    UINT16 = 4
-    # INT16 Signed 16-bit little-endian integer
-    INT16 = 5
-    # UINT32 Unsigned 32-bit little-endian integer
-    UINT32 = 6
-    # INT32 Signed 32-bit little-endian integer
-    INT32 = 7
-    # UINT64 Unsigned 64-bit little-endian integer
-    UINT64 = 8
-    # INT64 Signed 64-bit little-endian integer
-    INT64 = 9
-    # HALF_FLOAT 2-byte floating point value
-    HALF_FLOAT = 10
-    # FLOAT 4-byte floating point value
-    FLOAT = 11
-    # DOUBLE 8-byte floating point value
-    DOUBLE = 12
-    # STRING UTF8 variable-length string as List<Char>
-    STRING = 13
-    # BINARY Variable-length bytes (no guarantee of UTF8-ness)
-    BINARY = 14
-    # FIXED_SIZE_BINARY Fixed-size binary. Each value occupies the same number of bytes
-    FIXED_SIZE_BINARY = 15
-    # DATE32 int32_t days since the UNIX epoch
-    DATE32 = 16
-    # DATE64 int64_t milliseconds since the UNIX epoch
-    DATE64 = 17
-    # TIMESTAMP Exact timestamp encoded with int64 since UNIX epoch
-    # Default unit millisecond
-    TIMESTAMP = 18
-    # TIME32 Time as signed 32-bit integer representing either seconds or
-    # milliseconds since midnight
-    TIME32 = 19
-    # TIME64 Time as signed 64-bit integer representing either microseconds or
-    # nanoseconds since midnight
-    TIME64 = 20
-    # INTERVAL_MONTHS YEAR_MONTH interval in SQL style
-    INTERVAL_MONTHS = 21
-    # INTERVAL_DAY_TIME DAY_TIME interval in SQL style
-    INTERVAL_DAY_TIME = 22
-    # DECIMAL128 Precision- and scale-based decimal type with 128 bits.
-    DECIMAL128 = 23
-    # DECIMAL256 Precision- and scale-based decimal type with 256 bits.
-    DECIMAL256 = 24
-    # LIST A list of some logical data type
-    LIST = 25
-    # STRUCT Struct of logical types
-    STRUCT = 26
-    # SPARSE_UNION Sparse unions of logical types
-    SPARSE_UNION = 27
-    # DENSE_UNION Dense unions of logical types
-    DENSE_UNION = 28
-    # DICTIONARY Dictionary-encoded type also called "categorical" or "factor"
-    # in other programming languages. Holds the dictionary value
-    # type but not the dictionary itself which is part of the
-    # ArrayData struct
-    DICTIONARY = 29
-    # MAP Map a repeated struct logical type
-    MAP = 30
-    # EXTENSION Custom data type implemented by user
-    EXTENSION = 31
-    # FIXED_SIZE_LIST Fixed size list of some logical type
-    FIXED_SIZE_LIST = 31
-    # DURATION Measure of elapsed time in either seconds milliseconds microseconds
-    # or nanoseconds.
-    DURATION = 33
-    # LARGE_STRING Like STRING but with 64-bit offsets
-    LARGE_STRING = 34
-    # LARGE_BINARY Like BINARY but with 64-bit offsets
-    LARGE_BINARY = 35
-    # LARGE_LIST Like LIST but with 64-bit offsets
-    LARGE_LIST = 36
-    # MAX_ID Leave this at the end
-    MAX_ID = 37
-    DECIMAL = DECIMAL128
+    # a 8-bit signed integer.
+    INT8 = 2
+    # a 16-bit signed integer.
+    INT16 = 3
+    # a 32-bit signed integer.
+    INT32 = 4
+    # a 32-bit signed integer which uses fury var_int32 encoding.
+    VAR_INT32 = 5
+    # a 64-bit signed integer.
+    INT64 = 6
+    # a 64-bit signed integer which uses fury PVL encoding.
+    VAR_INT64 = 7
+    # a 64-bit signed integer which uses fury SLI encoding.
+    SLI_INT64 = 8
+    # a 16-bit floating point number.
+    FLOAT16 = 9
+    # a 32-bit floating point number.
+    FLOAT32 = 10
+    # a 64-bit floating point number including NaN and Infinity.
+    FLOAT64 = 11
+    # a text string encoded using Latin1/UTF16/UTF-8 encoding.
+    STRING = 12
+    # a data type consisting of a set of named values. Rust enum with non-predefined field values are not supported as
+    # an enum.
+    ENUM = 13
+    # an enum whose value will be serialized as the registered name.
+    NAMED_ENUM = 14
+    # a morphic(final) type serialized by Fury Struct serializer. i.e., it doesn't have subclasses. Suppose we're
+    # deserializing `List[SomeClass]`, we can save dynamic serializer dispatch since `SomeClass` is morphic(final).
+    STRUCT = 15
+    # a morphic(final) type serialized by Fury compatible Struct serializer.
+    COMPATIBLE_STRUCT = 16
+    # a `struct` whose type mapping will be encoded as a name.
+    NAMED_STRUCT = 17
+    # a `compatible_struct` whose type mapping will be encoded as a name.
+    NAMED_COMPATIBLE_STRUCT = 18
+    # a type which will be serialized by a customized serializer.
+    EXT = 19
+    # an `ext` type whose type mapping will be encoded as a name.
+    NAMED_EXT = 20
+    # a sequence of objects.
+    LIST = 21
+    # an unordered set of unique elements.
+    SET = 22
+    # a map of key-value pairs. Mutable types such as `list/map/set/array/tensor/arrow` are not allowed as key of map.
+    MAP = 23
+    # an absolute length of time, independent of any calendar/timezone, as a count of nanoseconds.
+    DURATION = 24
+    # a point in time, independent of any calendar/timezone, as a count of nanoseconds. The count is relative
+    # to an epoch at UTC midnight on January 1, 1970.
+    TIMESTAMP = 25
+    # a naive date without timezone. The count is days relative to an epoch at UTC midnight on Jan 1, 1970.
+    LOCAL_DATE = 26
+    # exact decimal value represented as an integer value in two's complement.
+    DECIMAL = 27
+    # a variable-length array of bytes.
+    BINARY = 28
+    # a multidimensional array which every sub-array can have different sizes but all have the same type.
+    # only allow numeric components. Other arrays will be taken as List. The implementation should support the
+    # interoperability between array and list.
+    ARRAY = 29
+    # one dimensional bool array.
+    BOOL_ARRAY = 30
+    # one dimensional int8 array.
+    INT8_ARRAY = 31
+    # one dimensional int16 array.
+    INT16_ARRAY = 32
+    # one dimensional int32 array.
+    INT32_ARRAY = 33
+    # one dimensional int64 array.
+    INT64_ARRAY = 34
+    # one dimensional half_float_16 array.
+    FLOAT16_ARRAY = 35
+    # one dimensional float32 array.
+    FLOAT32_ARRAY = 36
+    # one dimensional float64 array.
+    FLOAT64_ARRAY = 37
+    # an arrow [record batch](https://arrow.apache.org/docs/cpp/tables.html#record-batches) object.
+    ARROW_RECORD_BATCH = 38
+    # an arrow [table](https://arrow.apache.org/docs/cpp/tables.html#tables) object.
+    ARROW_TABLE = 39
 
-    FURY_TYPE_TAG = 256
-    FURY_SET = 257
-    FURY_PRIMITIVE_BOOL_ARRAY = 258
-    FURY_PRIMITIVE_SHORT_ARRAY = 259
-    FURY_PRIMITIVE_INT_ARRAY = 260
-    FURY_PRIMITIVE_LONG_ARRAY = 261
-    FURY_PRIMITIVE_FLOAT_ARRAY = 262
-    FURY_PRIMITIVE_DOUBLE_ARRAY = 263
-    FURY_STRING_ARRAY = 264
-    FURY_SERIALIZED_OBJECT = 265
-    FURY_BUFFER = 266
-    FURY_ARROW_RECORD_BATCH = 267
-    FURY_ARROW_TABLE = 268
+    # BOUND id remains at 64
+    BOUND = 64
+
+    @staticmethod
+    def is_namespaced_type(type_id: int) -> bool:
+        return type_id in __NAMESPACED_TYPES__
 
 
+__NAMESPACED_TYPES__ = {
+    TypeId.NAMED_EXT,
+    TypeId.NAMED_ENUM,
+    TypeId.NAMED_STRUCT,
+    TypeId.NAMED_COMPATIBLE_STRUCT,
+}
 Int8Type = TypeVar("Int8Type", bound=int)
 Int16Type = TypeVar("Int16Type", bound=int)
 Int32Type = TypeVar("Int32Type", bound=int)
@@ -232,11 +255,18 @@ def is_primitive_type(type_) -> bool:
 
 
 # Int8ArrayType = TypeVar("Int8ArrayType", bound=array.ArrayType)
+BoolArrayType = TypeVar("BoolArrayType")
 Int16ArrayType = TypeVar("Int16ArrayType", bound=array.ArrayType)
 Int32ArrayType = TypeVar("Int32ArrayType", bound=array.ArrayType)
 Int64ArrayType = TypeVar("Int64ArrayType", bound=array.ArrayType)
 Float32ArrayType = TypeVar("Float32ArrayType", bound=array.ArrayType)
 Float64ArrayType = TypeVar("Float64ArrayType", bound=array.ArrayType)
+BoolNDArrayType = TypeVar("BoolNDArrayType", bound=ndarray)
+Int16NDArrayType = TypeVar("Int16NDArrayType", bound=ndarray)
+Int32NDArrayType = TypeVar("Int32NDArrayType", bound=ndarray)
+Int64NDArrayType = TypeVar("Int64NDArrayType", bound=ndarray)
+Float32NDArrayType = TypeVar("Float32NDArrayType", bound=ndarray)
+Float64NDArrayType = TypeVar("Float64NDArrayType", bound=ndarray)
 
 
 _py_array_types = {
@@ -299,10 +329,18 @@ def infer_field(field_name, type_, visitor: TypeVisitor, types_path=None):
                 f"Collection types should be {list, dict} instead of {type_}"
             )
     else:
-        if hasattr(origin, "__annotations__"):
-            return visitor.visit_customized(field_name, type_, types_path=types_path)
-        else:
+        if is_function(origin) or not hasattr(origin, "__annotations__"):
             return visitor.visit_other(field_name, type_, types_path=types_path)
+        else:
+            return visitor.visit_customized(field_name, type_, types_path=types_path)
+
+
+def is_function(func):
+    return inspect.isfunction(func) or is_cython_function(func)
+
+
+def is_cython_function(func):
+    return getattr(func, "func_name", None) is not None
 
 
 def compute_string_hash(string):
@@ -338,8 +376,7 @@ def load_class(classname: str):
         raise Exception(f"Can't import class {cls_name} from module {mod_name}") from ex
 
 
-# from https://github.com/ericvsmith/dataclasses/blob/master/dataclass_tools.py
-# released under Apache License 2.0
+# This method is derived from https://github.com/ericvsmith/dataclasses/blob/5f6568c3468f872e8f447dc20666628387786397/dataclass_tools.py.
 def dataslots(cls):
     # Need to create a new class, since we can't set __slots__
     #  after a class has been created.

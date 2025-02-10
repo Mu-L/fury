@@ -1,6 +1,7 @@
-# Fury Go
-Fury is a blazing fast multi-language serialization framework powered by jit(just-in-time compilation) and zero-copy.
+# Apache Fury™ Go
 
-First Golang version are implemented using reflection, will come soon.
+Fury is a blazingly fast multi-language serialization framework powered by just-in-time compilation and zero-copy.
 
-We are implementing a static code generator to generate serializer code ahead to speed up serialization.
+Currently, Fury Go is implemented using reflection. In the future, we plan to implement a static code generator
+to generate serializer code ahead to speed up serialization, or implement a JIT framework which generate ASM
+instructions to speed up serialization.

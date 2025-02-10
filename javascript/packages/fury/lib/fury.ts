@@ -1,236 +1,136 @@
-import ClassResolver from './classResolver';
-import { BinaryReader, BinaryWriter } from './io';
-import { ReferenceResolver } from './referenceResolver';
-import { ConfigFlags, InternalSerializerType, Serializer, RefFlags, SerializerRead, Hps } from './type';
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
+import ClassResolver from "./classResolver";
+import { BinaryWriter } from "./writer";
+import { BinaryReader } from "./reader";
+import { ReferenceResolver } from "./referenceResolver";
+import { ConfigFlags, Serializer, Config, Language, MAGIC_NUMBER, Mode } from "./type";
+import { OwnershipError } from "./error";
+import { InputType, ResultType, TypeDescription } from "./description";
+import { generateSerializer, AnySerializer } from "./gen";
+import { TypeMeta } from "./meta/TypeMeta";
 
-export default (config?: {
-    hps: Hps | null;
-}) => {
-    const classResolver = new ClassResolver();
-    const referenceResolver = ReferenceResolver();
-    const binaryView = BinaryReader();
-    const binaryWriter = BinaryWriter(config);
+export default class {
+  binaryReader: BinaryReader;
+  binaryWriter: BinaryWriter;
+  classResolver = new ClassResolver();
+  referenceResolver: ReferenceResolver;
+  anySerializer: AnySerializer;
+  typeMeta = TypeMeta;
 
-    const fury = {
-        skipType,
-        readBySerializerWithOutTypeId,
-        read,
-        config,
-        deserialize,
-        writeNull,
-        writeNullOrRef,
-        write,
-        serialize,
-        referenceResolver,
-        classResolver,
-        binaryView,
-        binaryWriter,
-        buildRefTypeReader,
+  constructor(public config: Config = {
+    refTracking: false,
+    useSliceString: false,
+    hooks: {
+    },
+    mode: Mode.SchemaConsistent,
+  }) {
+    this.binaryReader = new BinaryReader(config);
+    this.binaryWriter = new BinaryWriter(config);
+    this.referenceResolver = new ReferenceResolver(this.binaryReader);
+    this.classResolver.init(this);
+    this.anySerializer = new AnySerializer(this);
+  }
+
+  registerSerializer<T extends TypeDescription>(description: T) {
+    const serializer = generateSerializer(this, description);
+    return {
+      serializer,
+      serialize: (data: InputType<T>) => {
+        return this.serialize(data, serializer);
+      },
+      serializeVolatile: (data: InputType<T>) => {
+        return this.serializeVolatile(data, serializer);
+      },
+      deserialize: (bytes: Uint8Array) => {
+        return this.deserialize(bytes, serializer) as ResultType<T>;
+      },
+    };
+  }
+
+  deserialize<T = any>(bytes: Uint8Array, serializer: Serializer = this.anySerializer): T | null {
+    this.referenceResolver.reset();
+    this.classResolver.reset();
+    this.binaryReader.reset(bytes);
+    if (this.binaryReader.int16() !== MAGIC_NUMBER) {
+      throw new Error("the fury xlang serialization must start with magic number 0x%x. Please check whether the serialization is based on the xlang protocol and the data didn't corrupt");
     }
-    classResolver.init(fury);
-
-    const { write: writeInt64 } = classResolver.getSerializerById(InternalSerializerType.INT64);
-    const { write: writeBool } = classResolver.getSerializerById(InternalSerializerType.BOOL);
-    const { write: stringWrite } = classResolver.getSerializerById(InternalSerializerType.STRING);
-    const { write: arrayWrite } = classResolver.getSerializerById(InternalSerializerType.ARRAY);
-    const { write: mapWrite } = classResolver.getSerializerById(InternalSerializerType.MAP);
-    const { write: setWrite } = classResolver.getSerializerById(InternalSerializerType.FURY_SET);
-    const { write: timestampWrite } = classResolver.getSerializerById(InternalSerializerType.TIMESTAMP);
-
-    function readSerializer() {
-        const typeId = binaryView.readInt16();
-        let serializer: Serializer;
-        if (typeId === InternalSerializerType.FURY_TYPE_TAG) {
-            serializer = classResolver.getSerializerByTag(classResolver.readTag(binaryView));
-        } else {
-            serializer = classResolver.getSerializerById(typeId);
-        }
-        if (!serializer) {
-            throw new Error(`cant find implements of typeId: ${typeId}`);
-        }
-        return serializer;
+    const bitmap = this.binaryReader.uint8();
+    if ((bitmap & ConfigFlags.isNullFlag) === ConfigFlags.isNullFlag) {
+      return null;
     }
-
-    function skipType() {
-        const typeId = binaryView.readInt16();
-        if (typeId === InternalSerializerType.FURY_TYPE_TAG) {
-            classResolver.readTag(binaryView);
-        }
+    const isLittleEndian = (bitmap & ConfigFlags.isLittleEndianFlag) === ConfigFlags.isLittleEndianFlag;
+    if (!isLittleEndian) {
+      throw new Error("big endian is not supported now");
     }
-
-    function buildRefTypeReader<T>(fn: SerializerRead<T>) {
-        return () => {
-            switch (referenceResolver.readRefFlag(binaryView)) {
-                case RefFlags.RefValueFlag:
-                    skipType();
-                    return fn();
-                case RefFlags.RefFlag:
-                    return referenceResolver.getReadObjectByRefId(binaryView.readVarInt32());
-                case RefFlags.NullFlag:
-                    return null;
-                case RefFlags.NotNullValueFlag:
-                    skipType();
-                    return fn()
-            }
-        }
+    const isCrossLanguage = (bitmap & ConfigFlags.isCrossLanguageFlag) == ConfigFlags.isCrossLanguageFlag;
+    if (!isCrossLanguage) {
+      throw new Error("support crosslanguage mode only");
     }
-    
-
-    function readBySerializerWithOutTypeId(read: SerializerRead) {
-        const flag = referenceResolver.readRefFlag(binaryView);
-        switch (flag) {
-            case RefFlags.RefValueFlag:
-                return read()
-            case RefFlags.RefFlag:
-                return referenceResolver.getReadObjectByRefId(binaryView.readVarInt32());
-            case RefFlags.NullFlag:
-                return null;
-            case RefFlags.NotNullValueFlag:
-                return read()
-        }
+    const isOutOfBandEnabled = (bitmap & ConfigFlags.isOutOfBandFlag) === ConfigFlags.isOutOfBandFlag;
+    if (isOutOfBandEnabled) {
+      throw new Error("outofband mode is not supported now");
     }
 
-    function read() {
-        const flag = referenceResolver.readRefFlag(binaryView);
-        switch (flag) {
-            case RefFlags.RefValueFlag:
-                return readSerializer().read();
-            case RefFlags.RefFlag:
-                return referenceResolver.getReadObjectByRefId(binaryView.readVarInt32());
-            case RefFlags.NullFlag:
-                return null;
-            case RefFlags.NotNullValueFlag:
-                return readSerializer().read();
-        }
+    this.binaryReader.uint8(); // skip language
+    this.binaryReader.int32(); // native object offset. should skip.  javascript support cross mode only
+    this.binaryReader.int32(); // native object size. should skip.
+    return serializer.read();
+  }
+
+  private serializeInternal<T = any>(data: T, serializer: Serializer) {
+    try {
+      this.binaryWriter.reset();
+    } catch (e) {
+      if (e instanceof OwnershipError) {
+        throw new Error("Permission denied. To release the serialization ownership, you must call the dispose function returned by serializeVolatile.");
+      }
+      throw e;
     }
-
-    function deserialize<T = any>(bytes: Buffer): T | null {
-        referenceResolver.reset();
-        classResolver.reset();
-        binaryView.reset(bytes);
-        const bitmap = binaryView.readUInt8();
-        if ((bitmap & ConfigFlags.isNullFlag) === ConfigFlags.isNullFlag) {
-            return null;
-        }
-        const isLittleEndian = (bitmap & ConfigFlags.isLittleEndianFlag) === ConfigFlags.isLittleEndianFlag;
-        if (!isLittleEndian) {
-            throw new Error('big endian is not supported now')
-        }
-        const isCrossLanguage = (bitmap & ConfigFlags.isCrossLanguageFlag) == ConfigFlags.isCrossLanguageFlag
-        if (!isCrossLanguage) {
-            throw new Error('support crosslanguage mode only')
-        }
-        binaryView.readUInt8(); // skip language type
-        const isOutOfBandEnabled = (bitmap & ConfigFlags.isOutOfBandFlag) === ConfigFlags.isOutOfBandFlag;
-        if (isOutOfBandEnabled) {
-            throw new Error('outofband mode is not supported now')
-        }
-        binaryView.readInt32(); // native object offset. should skip.  javascript support cross mode only
-        binaryView.readInt32(); // native object size. should skip.
-        return read();
+    this.referenceResolver.reset();
+    this.classResolver.reset();
+    let bitmap = 0;
+    if (data === null) {
+      bitmap |= ConfigFlags.isNullFlag;
     }
+    bitmap |= ConfigFlags.isLittleEndianFlag;
+    bitmap |= ConfigFlags.isCrossLanguageFlag;
+    this.binaryWriter.int16(MAGIC_NUMBER);
+    this.binaryWriter.uint8(bitmap);
+    this.binaryWriter.uint8(Language.JAVASCRIPT);
+    const cursor = this.binaryWriter.getCursor();
+    this.binaryWriter.skip(4); // preserve 4-byte for nativeObjects start offsets.
+    this.binaryWriter.uint32(0); // nativeObjects length.
+    // reserve fixed size
+    this.binaryWriter.reserve(serializer.meta.fixedSize);
+    // start write
+    serializer.write(data);
+    this.binaryWriter.setUint32Position(cursor, this.binaryWriter.getCursor()); // nativeObjects start offsets;
+    return this.binaryWriter;
+  }
 
-    function writeNull(v: any) {
-        if (v === null) {
-            binaryWriter.writeInt8(RefFlags.NullFlag);
-            return true;
-        } else {
-            return false;
-        }
-    }
+  serialize<T = any>(data: T, serializer: Serializer = this.anySerializer) {
+    return this.serializeInternal(data, serializer).dump();
+  }
 
-    function writeNullOrRef(v: any) {
-        if (v !== null) {
-            const existsId = referenceResolver.existsWriteObject(v);
-            if (typeof existsId === 'number') {
-                binaryWriter.writeInt8(RefFlags.RefFlag);
-                binaryWriter.writeVarInt32(existsId);
-                return true;
-            }
-            return false;
-        } else {
-            binaryWriter.writeInt8(RefFlags.NullFlag);
-            return true;
-        }
-    }
-
-    function write(v: any) {
-        // NullFlag
-        if (v === null || v === undefined) {
-            binaryWriter.writeInt8(RefFlags.NullFlag); // null
-            return;
-        }
-
-        // NotNullValueFlag
-        if (typeof v === "number") {
-            writeInt64(BigInt(v));
-            return;
-        }
-        if (typeof v === "bigint") {
-            writeInt64(v)
-            return;
-        }
-
-        if (typeof v === "boolean") {
-            writeBool(v)
-            return;
-        }
-
-        // RefFlag
-        const existsId = referenceResolver.existsWriteObject(v);
-        if (typeof existsId === 'number') {
-            binaryWriter.writeInt8(RefFlags.RefFlag);
-            binaryWriter.writeVarInt32(existsId);
-            return;
-        }
-
-        // RefValueFlag
-        if (v instanceof Map) {
-            mapWrite(v);
-            return;
-        }
-        if (v instanceof Set) {
-            setWrite(v);
-            return;
-        }
-        if (Array.isArray(v)) {
-            arrayWrite(v);
-            return;
-        }
-
-        if (v instanceof Date) {
-            timestampWrite(v);
-            return;
-        }
-
-        if (typeof v === "string") {
-            stringWrite(v);
-            return;
-        }
-        throw new Error(`serializer not support ${typeof v} yet`);
-    }
-
-    function serialize<T = any>(data: T, serializer?: Serializer) {
-        referenceResolver.reset();
-        classResolver.reset();
-        binaryWriter.reset();
-        let bitmap = 0;
-        if (data === null) {
-            bitmap |= ConfigFlags.isNullFlag;
-        }
-        bitmap |= ConfigFlags.isLittleEndianFlag;
-        bitmap |= ConfigFlags.isCrossLanguageFlag
-        binaryWriter.writeUInt8(bitmap);
-        binaryWriter.writeUInt8(4); // todo: replace with javascript
-        binaryWriter.skip(4) // preserve 4-byte for nativeObjects start offsets.
-        binaryWriter.skip(4) // preserve 4-byte for nativeObjects length.
-        if (serializer) {
-            serializer.write(data);
-        } else {
-            write(data);
-        }
-        return binaryWriter.dump();
-    }
-    return fury;
+  serializeVolatile<T = any>(data: T, serializer: Serializer = this.anySerializer) {
+    return this.serializeInternal(data, serializer).dumpAndOwn();
+  }
 }

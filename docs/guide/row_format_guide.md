@@ -1,10 +1,13 @@
-<!-- fury_frontmatter --
+---
 title: Row Format Guide
-order: 1
--- fury_frontmatter -->
+sidebar_position: 1
+id: row_format_guide
+---
 
 ## Row format protocol
+
 ### Java
+
 ```java
 public class Bar {
   String f1;
@@ -18,7 +21,7 @@ public class Foo {
   List<Bar> f4;
 }
 
-Encoder<Foo> encoder = Encoders.bean(Foo.class);
+RowEncoder<Foo> encoder = Encoders.bean(Foo.class);
 Foo foo = new Foo();
 foo.f1 = 10;
 foo.f2 = IntStream.range(0, 1000000).boxed().collect(Collectors.toList());
@@ -38,18 +41,20 @@ Foo newFoo = encoder.fromRow(binaryRow);
 // zero-copy read List<Integer> f2
 BinaryArray binaryArray2 = binaryRow.getArray(1);
 // zero-copy read List<Bar> f4
-BinaryArray binaryArray4 = binaryRow.getArray(4);
+BinaryArray binaryArray4 = binaryRow.getArray(3);
 // zero-copy read 11th element of `readList<Bar> f4`
 BinaryRow barStruct = binaryArray4.getStruct(10);
 
 // zero-copy read 6th of f2 of 11th element of `readList<Bar> f4`
-barStruct.getArray(1).getLong(5);
-Encoder<Bar> barEncoder = Encoders.bean(Bar.class);
+barStruct.getArray(1).getInt64(5);
+RowEncoder<Bar> barEncoder = Encoders.bean(Bar.class);
 // deserialize part of data.
 Bar newBar = barEncoder.fromRow(barStruct);
 Bar newBar2 = barEncoder.fromRow(binaryArray4.getStruct(20));
 ```
+
 ### Python
+
 ```python
 @dataclass
 class Bar:
@@ -78,10 +83,13 @@ new_foo = pickle.loads(binary)
 print(new_foo.f2[100000], new_foo.f4[100000].f1, new_foo.f4[200000].f2[5])
 print(f"pickle end: {datetime.datetime.now()}")
 ```
+
 ### Apache Arrow Support
+
 Fury Format also supports automatic conversion from/to Arrow Table/RecordBatch.
 
 Java:
+
 ```java
 Schema schema = TypeInference.inferSchema(BeanA.class);
 ArrowWriter arrowWriter = ArrowUtils.createArrowWriter(schema);
@@ -92,14 +100,18 @@ for (int i = 0; i < 10; i++) {
 }
 return arrowWriter.finishAsRecordBatch();
 ```
+
 Python:
+
 ```python
 import pyfury
 encoder = pyfury.encoder(Foo)
 encoder.to_arrow_record_batch([foo] * 10000)
 encoder.to_arrow_table([foo] * 10000)
 ```
+
 C++
+
 ```c++
 std::shared_ptr<ArrowWriter> arrow_writer;
 EXPECT_TRUE(
@@ -114,6 +126,7 @@ EXPECT_TRUE(record_batch->Validate().ok());
 EXPECT_EQ(record_batch->num_columns(), schema->num_fields());
 EXPECT_EQ(record_batch->num_rows(), row_nums);
 ```
+
 ```java
 Schema schema = TypeInference.inferSchema(BeanA.class);
 ArrowWriter arrowWriter = ArrowUtils.createArrowWriter(schema);

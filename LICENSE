@@ -178,7 +178,7 @@
    APPENDIX: How to apply the Apache License to your work.
 
       To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "{}"
+      boilerplate notice, with the fields enclosed by brackets "[]"
       replaced with your own identifying information. (Don't include
       the brackets!)  The text should be enclosed in the appropriate
       comment syntax for the file format. We also recommend that a
@@ -186,7 +186,7 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2023 FURY authors
+   Copyright [yyyy] [name of copyright owner]
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -200,43 +200,110 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
+================================================================
 
-Apache Software Foundation License 2.0
---------------------------------------
-java/fury-core/src/main/java/io/fury/util/Platform.java is modified from https://github.com/apache/spark/blob/master/common/unsafe/src/main/java/org/apache/spark/unsafe/Platform.java
+This product includes a number of Dependencies with separate copyright notices
+and license terms. Your use of these submodules is subject to the terms and
+conditions of the following licenses.
 
-capitalize/uncapitalize/isBlank methods in java/fury-core/src/main/java/io/fury/util/StringUtils.java is copied from https://github.com/apache/commons-lang/blob/master/src/main/java/org/apache/commons/lang3/StringUtils.java
+================================================================
 
-java/fury-core/src/main/java/io/fury/util/DateTimeUtils.java is modified from https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/util/DateTimeUtils.scala
+================================================================
+Apache-2.0 licenses
+================================================================
+The following components are provided under the Apache-2.0 License. See project link for details.
+The text of each license is the standard Apache 2.0 license.
 
-compare/swap/copy and absolute read/write methods in java/fury-core/src/main/java/io/fury/memory/MemoryBuffer.java is modified from https://github.com/apache/flink/blob/master/flink-core/src/main/java/org/apache/flink/core/memory/MemorySegment.java
+* guava (https://github.com/google/guava)
+    Files:
+      java/fury-core/src/main/java/org/apache/fury/util/Preconditions.java
+      java/fury-core/src/main/java/org/apache/fury/reflect/TypeParameter.java
+      java/fury-core/src/main/java/org/apache/fury/reflect/TypeRef.java
+      java/fury-core/src/main/java/org/apache/fury/util/concurrency/DirectExecutorService.java
 
-writeVarInt/writeVarLong in java/fury-core/src/main/java/io/fury/memory/MemoryBuffer.java is modified from https://github.com/EsotericSoftware/kryo/blob/master/src/com/esotericsoftware/kryo/unsafe/UnsafeOutput.java
+* spark (https://github.com/apache/spark)
+    Files:
+      java/fury-core/src/main/java/org/apache/fury/codegen/Code.java
+      java/fury-core/src/main/java/org/apache/fury/memory/Platform.java
+      java/fury-format/src/main/java/org/apache/fury/format/vectorized/ArrowWriter.java
 
-java/fury-core/src/main/java/io/fury/util/{FuryObjectMap/ObjectIntMap/IdentityMap/IdentityObjectIntMap/LongMap}.java are adapted from  https://github.com/EsotericSoftware/kryo/blob/master/src/com/esotericsoftware/kryo/util/{ObjectMap/ObjectIntMap/IdentityMap/IdentityObjectIntMap/IntMap}.java
+* commons-io (https://github.com/apache/commons-io)
+    Files:
+      java/fury-core/src/main/java/org/apache/fury/io/ClassLoaderObjectInputStream.java
 
-{ParentClassLoader/ChildFirstURLClassLoader} in java/fury-core/src/main/java/io/fury/util/ClassLoaderUtils.java is copied from https://github.com/apache/spark/blob/master/core/src/main/java/org/apache/spark/util/{ParentClassLoader/ChildFirstURLClassLoader}.java
 
-java/fury-core/src/main/java/io/fury/type/Generics.java is modified from https://github.com/EsotericSoftware/kryo/blob/master/src/com/esotericsoftware/kryo/util/DefaultGenerics.java
+* fast-serialization (https://github.com/RuedigerMoeller/fast-serialization)
+    Files:
+      java/benchmark/src/main/java/org/apache/fury/benchmark/Identity2IdMap.java
 
-java/fury-core/src/test/java/io/fury/type/GenericsTest.java is modified from https://github.com/EsotericSoftware/kryo/blob/master/test/com/esotericsoftware/kryo/util/GenericsUtilTest.java
+* ray (https://github.com/ray-project/ray)
+    Files:
+      ci/format.sh
+      bazel/fury_deps_setup.bzl
+      bazel/grpc-cython-copts.patch
+      bazel/grpc-python.patch
 
-java/fury-core/src/main/java/io/fury/io/ClassLoaderObjectInputStream.java is copied from https://github.com/apache/commons-io/blob/master/src/main/java/org/apache/commons/io/input/ClassLoaderObjectInputStream.java
+* tensorflow (https://github.com/tensorflow/tensorflow)
+    Files:
+      bazel/arrow/pyarrow_configure.bzl
 
-java/fury-core/src/main/java/io/fury/memory/BitUtils.java is modified from https://github.com/apache/spark/blob/master/common/unsafe/src/main/java/org/apache/spark/unsafe/bitset/BitSetMethods.java and https://github.com/apache/arrow/blob/main/java/vector/src/main/java/org/apache/arrow/vector/BitVectorHelper.java
 
-src/main/java/io/fury/format/row/Getters.java is modified from https://github.com/apache/spark/blob/master/sql/catalyst/src/main/java/org/apache/spark/sql/catalyst/expressions/SpecializedGetters.java
+================================================================
+BSD-3-Clause licenses
+================================================================
+The following components are provided under the BSD-3-Clause License. See project link for details.
+The text of each license is also included in licenses/LICENSE-[project].txt.
 
-java/fury-core/src/main/java/io/fury/codegen/Code.java is modified from https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/codegen/javaCode.scala
+* kryo (https://github.com/EsotericSoftware/kryo)
+    Files:
+      java/benchmark/src/main/java/org/apache/fury/benchmark/data/Data.java
+      java/benchmark/src/main/java/org/apache/fury/benchmark/data/Image.java
+      java/benchmark/src/main/java/org/apache/fury/benchmark/data/Media.java
+      java/benchmark/src/main/java/org/apache/fury/benchmark/data/MediaContent.java
+      java/benchmark/src/main/java/org/apache/fury/benchmark/data/Sample.java
+      java/benchmark/src/main/java/org/apache/fury/benchmark/state/BufferType.java
+      java/benchmark/src/main/java/org/apache/fury/benchmark/state/KryoState.java
+      java/fury-core/src/main/java/org/apache/fury/collection/FuryObjectMap.java
+      java/fury-core/src/main/java/org/apache/fury/collection/IdentityMap.java
+      java/fury-core/src/main/java/org/apache/fury/collection/IdentityObjectIntMap.java
+      java/fury-core/src/main/java/org/apache/fury/collection/LongMap.java
+      java/fury-core/src/main/java/org/apache/fury/collection/LongLongMap.java
+      java/fury-core/src/main/java/org/apache/fury/collection/ObjectIntMap.java
+      java/fury-core/src/main/java/org/apache/fury/type/Generics.java
+      java/fury-core/src/test/java/org/apache/fury/type/GenericsTest.java
 
-src/main/java/io/fury/format/vectorized/ArrowWriter.java is modified from https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/execution/arrow/ArrowWriter.scala
+* v8 (https://chromium.googlesource.com/v8/v8.git)
+    Files:
+      javascript/packages/hps/src/v8-fast-api-calls.h
 
-bazel/arrow/pyarrow_configure.bzl is modified from  https://github.com/tensorflow/tensorflow/blob/5a244072f2b33d2347e803146c244c179c1ddb75/third_party/py/python_configure.bzl
 
-ci/format.sh is modified from https://github.com/ray-project/ray/blob/master/ci/lint/format.sh
+================================================================
+MIT licenses
+================================================================
+The following components are provided under the MIT License. See project link for details.
+The text of each license is also included in licenses/LICENSE-[project].txt
 
-lazy_import method in python/pyfury/util.py is copied from https://github.com/mars-project/mars/blob/master/mars/utils.py
+* murmurHash3.js (https://github.com/karanlyons/murmurHash3.js)
+    Files:
+      javascript/packages/fury/lib/murmurHash3.ts
 
-dataslots in pytho/pyfury/type.py is copied from https://github.com/ericvsmith/dataclasses/blob/master/dataclass_tools.py
+* cython-abseil-sample (https://github.com/messense/cython-abseil-sample)
+    Files:
+      python/pyfury/includes/libabsl.pxd
 
-java/fury-benchmark/src/main/java/io/fury/benchmark/Identity2IdMap.java is modified from https://github.com/RuedigerMoeller/fast-serialization/blob/master/src/main/java/org/nustaq/serialization/util/FSTIdentity2IdMap.java to benchmark identity map performance
+
+================================================================
+Public Domain
+================================================================
+The following components are placed in the public domain.
+The author hereby disclaims copyright to this source code.
+See project link for details.
+
+* smhasher (https://github.com/aappleby/smhasher)
+    Files:
+      src/fury/thirdparty/MurmurHash3.cc
+      src/fury/thirdparty/MurmurHash3.h
+
+* java_util (https://github.com/yonik/java_util)
+    Files:
+      java/fury-core/src/main/java/org/apache/fury/util/MurmurHash3.java

@@ -1,43 +1,79 @@
-name: Publish Fury 📦
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Publish Fury
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
-  release-python:
-    name: Publish Python 📦 to PyPI
-    runs-on: ubuntu-20.04
+  build-wheels:
+    name: Build Wheels
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: [3.8, 3.9, "3.10", 3.11, 3.12, 3.13]
+        os: [ubuntu-latest, macos-13, macos-14, windows-2022] # macos-13: x86, macos-14: arm64
+
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install bazel
-        run: ./ci/run_ci.sh install_bazel
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+              ./ci/run_ci.sh install_bazel_windows
+          else
+              ./ci/run_ci.sh install_bazel
+          fi
       - name: Update version in setup.py
-        run: |
-          echo "GITHUB_REF: $GITHUB_REF" 
-          tag=$(echo $GITHUB_REF | cut -d / -f 3)
-          echo "tag: $tag"
-          version=${tag:1}
-          echo "version $version"
-          ci/deploy.sh bump_version $version
+        shell: bash
+        run: ci/deploy.sh bump_py_version
       - name: Build a binary wheel
+        shell: bash
         run: |
-          pip install pyarrow==4.0.0 Cython wheel numpy pytest
-          cd python
-          pip list
-          export PATH=~/bin:$PATH
-          echo "Build pyfury"
-          python setup.py bdist_wheel
-      - name: Publish wheel 📦 to PyPI
-        uses: pypa/gh-action-pypi-publish@master
+          ci/deploy.sh build_pyfury
+          ci/deploy.sh rename_wheels dist
+      - name: Upload Wheel Artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: pyfury-wheels-${{ matrix.os }}-${{ matrix.python-version }}
+          path: dist/*.whl
+
+  publish-wheels:
+    name: Publish Wheels
+    runs-on: ubuntu-latest
+    needs: build-wheels
+    steps:
+      - name: Download Wheel Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded_wheels/
+          merge-multiple: true
+      - name: Display structure of downloaded files
+        run: ls -R downloaded_wheels
+      - name: Publish Wheels to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
-          packages-dir: python/dist/
+          packages-dir: downloaded_wheels/
