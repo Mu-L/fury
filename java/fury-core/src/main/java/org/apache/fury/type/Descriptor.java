@@ -85,7 +85,9 @@ public class Descriptor {
   private final Field field;
   private final Method readMethod;
   private final Method writeMethod;
-  private final FuryField furyField;
+  private FuryField furyField;
+  private boolean nullable;
+  private boolean trackingRef;
 
   public Descriptor(Field field, TypeRef<?> typeRef, Method readMethod, Method writeMethod) {
     this.field = field;
@@ -97,6 +99,9 @@ public class Descriptor {
     this.writeMethod = writeMethod;
     this.typeRef = typeRef;
     this.furyField = this.field.getAnnotation(FuryField.class);
+    if (!typeRef.isPrimitive()) {
+      this.nullable = furyField == null || furyField.nullable();
+    }
   }
 
   public Descriptor(TypeRef<?> typeRef, String name, int modifier, String declaringClass) {
@@ -109,6 +114,7 @@ public class Descriptor {
     this.readMethod = null;
     this.writeMethod = null;
     this.furyField = null;
+    this.nullable = !typeRef.isPrimitive();
   }
 
   private Descriptor(Field field, Method readMethod) {
@@ -121,6 +127,9 @@ public class Descriptor {
     this.writeMethod = null;
     this.typeRef = null;
     this.furyField = this.field.getAnnotation(FuryField.class);
+    if (!field.getType().isPrimitive()) {
+      this.nullable = furyField == null || furyField.nullable();
+    }
   }
 
   private Descriptor(
@@ -141,16 +150,37 @@ public class Descriptor {
     this.readMethod = readMethod;
     this.writeMethod = writeMethod;
     this.furyField = this.field == null ? null : this.field.getAnnotation(FuryField.class);
+    if (!typeRef.isPrimitive()) {
+      this.nullable = furyField == null || furyField.nullable();
+    }
+  }
+
+  public Descriptor(DescriptorBuilder builder) {
+    this(
+        builder.typeRef,
+        builder.typeName,
+        builder.name,
+        builder.modifier,
+        builder.declaringClass,
+        builder.field,
+        builder.readMethod,
+        builder.writeMethod);
+    this.nullable = builder.nullable;
+    this.trackingRef = builder.trackingRef;
+    this.type = builder.type;
+    this.furyField = builder.furyField;
+  }
+
+  public DescriptorBuilder copyBuilder() {
+    return new DescriptorBuilder(this);
   }
 
   public Descriptor copy(Method readMethod, Method writeMethod) {
-    return new Descriptor(
-        typeRef, typeName, name, modifier, declaringClass, field, readMethod, writeMethod);
+    return new DescriptorBuilder(this).readMethod(readMethod).writeMethod(writeMethod).build();
   }
 
   public Descriptor copyWithTypeName(String typeName) {
-    return new Descriptor(
-        typeRef, typeName, name, modifier, declaringClass, field, readMethod, writeMethod);
+    return new DescriptorBuilder(this).typeName(typeName).build();
   }
 
   public Field getField() {
@@ -159,6 +189,22 @@ public class Descriptor {
 
   public String getName() {
     return name;
+  }
+
+  public Class<?> getType() {
+    return type;
+  }
+
+  public boolean isNullable() {
+    return nullable;
+  }
+
+  public boolean isTrackingRef() {
+    return trackingRef;
+  }
+
+  public int getModifier() {
+    return modifier;
   }
 
   public String getSnakeCaseName() {
